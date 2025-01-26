@@ -10,6 +10,7 @@ from langchain_core.messages import AnyMessage, SystemMessage, HumanMessage, Too
 from langchain_openai import ChatOpenAI
 from langchain_community.tools.tavily_search import TavilySearchResults
 from langgraph.checkpoint.memory import MemorySaver
+import asyncio
 
 # Tavily Tool   
 tool = TavilySearchResults(max_results=2, api_key=os.getenv("TAVILY_API_KEY")) #increased number of results
@@ -84,3 +85,23 @@ thread = {"configurable": {"thread_id": "1"}}
 for event in abot.graph.stream({"messages": messages}, thread):
     for v in event.values():
         print(v)
+
+
+from langgraph.checkpoint.memory import AsyncMemorySaver
+memory = AsyncMemorySaver()
+abot = Agent(model, [tool], system=prompt, checkpointer=memory)
+
+async def run_agent():
+    messages = [HumanMessage(content="What is the weather in SF?")]
+    thread = {"configurable": {"thread_id": "4"}}
+    
+    async for event in abot.graph.astream_events({"messages": messages}, thread, version="v1"):
+        kind = event["event"]
+        if kind == "on_chat_model_stream":
+            content = event["data"]["chunk"].content
+            if content:
+                print(content, end="|")
+
+# Run the async function
+if __name__ == "__main__":
+    asyncio.run(run_agent())
